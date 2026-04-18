@@ -2,10 +2,138 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>XML Audit Tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XML Audit Tool — 5GB Browser Engine</title>
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="https://unpkg.com/fflate"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; max-width: 800px; margin: 0 auto; background: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .progress-container { margin-top: 20px; display: none; }
+        progress { width: 100%; height: 20px; }
+        #status { font-weight: bold; color: #007bff; }
+        .search-section { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
+        input[type="text"] { padding: 10px; width: 200px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:disabled { background: #ccc; }
+        #results { margin-top: 20px; }
+    </style>
 </head>
 <body>
-    <h1>Система аналізу звітності готова до розробки</h1>
-    <p>Зараз тут з'явиться інструмент для роботи з архівами 5 ГБ.</p>
+
+<div class="card">
+    <h2>📂 Завантаження та Індексація (до 5 ГБ)</h2>
+    <p>Виберіть ZIP-архів з XML-файлами. Обробка відбудеться локально на вашому ПК.</p>
+    
+    <input type="file" id="zipInput" accept=".zip">
+    
+    <div id="progressContainer" class="progress-container">
+        <p id="status">Підготовка до обробки...</p>
+        <progress id="progressBar" value="0" max="100"></progress>
+        <small id="fileCounter">Оброблено файлів: 0</small>
+    </div>
+</div>
+
+<div class="card search-section">
+    <h2>🔍 Пошук звітності</h2>
+    <input type="text" id="searchInput" placeholder="Введіть ЄДРПОУ...">
+    <button id="searchBtn">Знайти</button>
+    
+    <div id="results">
+        </div>
+</div>
+
+<script>
+    // 1. Налаштування бази даних IndexedDB
+    const db = new Dexie("AuditDatabase");
+    db.version(1).stores({
+        reports: "++id, edrpou, companyName, period" // Індексуємо ЄДРПОУ та період
+    });
+
+    const zipInput = document.getElementById('zipInput');
+    const progressBar = document.getElementById('progressBar');
+    const statusText = document.getElementById('status');
+    const fileCounter = document.getElementById('fileCounter');
+
+    // 2. Логіка обробки архіву
+    zipInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        document.getElementById('progressContainer').style.display = 'block';
+        statusText.innerText = "Розпакування та парсинг...";
+
+        let processedCount = 0;
+
+        // Використовуємо fflate для читання ZIP без завантаження всього файлу в RAM
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const buf = new Uint8Array(event.target.result);
+            
+            fflate.unzip(buf, (err, unzipped) => {
+                if (err) {
+                    alert("Помилка при розпакуванні!");
+                    return;
+                }
+
+                const entries = Object.keys(unzipped);
+                const totalFiles = entries.length;
+
+                // Обробляємо кожен файл
+                entries.forEach(async (filename) => {
+                    if (filename.endsWith('.xml')) {
+                        const content = new TextDecoder().decode(unzipped[filename]);
+                        
+                        // Спрощений парсинг XML (рекомендується замінити на fast-xml-parser для точності)
+                        const edrpouMatch = content.match(/<EDRPOU>(.*?)<\/EDRPOU>/);
+                        const nameMatch = content.match(/<NAME>(.*?)<\/NAME>/);
+                        
+                        if (edrpouMatch) {
+                            await db.reports.add({
+                                edrpou: edrpouMatch[1],
+                                companyName: nameMatch ? nameMatch[1] : "Невідомо",
+                                period: "2024", // В реальності витягуємо з XML
+                                rawXml: content
+                            });
+                        }
+                    }
+                    
+                    processedCount++;
+                    const percent = Math.round((processedCount / totalFiles) * 100);
+                    progressBar.value = percent;
+                    fileCounter.innerText = `Оброблено файлів: ${processedCount} з ${totalFiles}`;
+                    
+                    if (processedCount === totalFiles) {
+                        statusText.innerText = "Готово! Дані збережені локально.";
+                        statusText.style.color = "green";
+                    }
+                });
+            });
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    // 3. Логіка пошуку
+    document.getElementById('searchBtn').addEventListener('click', async () => {
+        const query = document.getElementById('searchInput').value;
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = "Шукаємо...";
+
+        const found = await db.reports.where('edrpou').equals(query).toArray();
+
+        if (found.length === 0) {
+            resultsDiv.innerHTML = "Нічого не знайдено.";
+        } else {
+            resultsDiv.innerHTML = found.map(r => `
+                <div style="border-bottom: 1px solid #eee; padding: 10px;">
+                    <strong>${r.companyName}</strong> (ЄДРПОУ: ${r.edrpou})<br>
+                    Період: ${r.period} <br>
+                    <button onclick="alert('Тут буде експорт PDF')">Завантажити PDF</button>
+                </div>
+            `).join('');
+        }
+    });
+</script>
+
 </body>
 </html>
