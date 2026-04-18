@@ -85,7 +85,7 @@
                         const content = new TextDecoder().decode(unzipped[filename]);
                         
                         // Спрощений парсинг XML (рекомендується замінити на fast-xml-parser для точності)
-                        const edrpouMatch = content.match(/<EDRPOU>(.*?)<\/EDRPOU>/);
+                        const edrpouMatch = content.match(/<FIRM_EDRPOU>(.*?)<\/FIRM_EDRPOU>/);
                         const nameMatch = content.match(/<NAME>(.*?)<\/NAME>/);
                         
                         if (edrpouMatch) {
