@@ -1,155 +1,101 @@
-<!DOCTYPE html>
-<html lang="uk">
-<head>
-    <meta charset="UTF-8">
-    <title>Фінансовий Аналітик — Обробка ZIP</title>
-    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
-    <script src="https://unpkg.com/fflate"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fast-xml-parser@4.2.7/src/fxp.min.js"></script>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 40px; color: #333; }
-        .container { max-width: 900px; margin: 0 auto; }
-        .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        .btn-main { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; }
-        .btn-clear { background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; float: right; }
-        progress { width: 100%; height: 12px; border-radius: 6px; margin: 15px 0; }
-        #log { font-size: 12px; background: #222; color: #0f0; padding: 15px; border-radius: 8px; max-height: 150px; overflow-y: auto; font-family: monospace; margin-top: 15px; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <div class="card">
-        <button class="btn-clear" onclick="clearDatabase()">Очистити базу</button>
-        <h2>📊 Завантаження звітності (ZIP)</h2>
-        <p>Ви можете вибрати відразу кілька ZIP-архівів. Система обробить їх по черзі.</p>
-        
-        <input type="file" id="zipInput" accept=".zip" multiple>
-        
-        <div id="progressArea" style="display:none;">
-            <progress id="progressBar" value="0" max="100"></progress>
-            <div id="statusText">Очікування файлів...</div>
-            <div id="log"></div>
-        </div>
-    </div>
-
-    <div class="card">
-        <h2>🔍 Пошук за ЄДРПОУ</h2>
-        <input type="text" id="searchInput" placeholder="Наприклад: 12345678" style="padding: 12px; width: 250px; border: 1px solid #ddd; border-radius: 8px;">
-        <button class="btn-main" onclick="searchCompany()">Знайти компанію</button>
-        <div id="resultsArea" style="margin-top:25px;"></div>
-    </div>
-</div>
-
-<script>
+// 1. Налаштування бази
     const db = new Dexie("AuditDB");
-    db.version(1).stores({
-        reports: "++id, edrpou, companyName, period"
+    db.version(2).stores({
+        reports: "++id, edrpou, companyName, period" 
     });
 
-    const parser = new XMLParser();
+    const parser = new XMLParser({ ignoreAttributes: false });
 
-    async function clearDatabase() {
-        if(confirm("Видалити всі завантажені дані?")) {
-            await db.reports.clear();
-            alert("Базу очищено");
-            location.reload();
-        }
-    }
-
-    function addLog(msg) {
-        const log = document.getElementById('log');
-        log.innerHTML += `> ${msg}<br>`;
-        log.scrollTop = log.scrollHeight;
-    }
-
-    document.getElementById('zipInput').addEventListener('change', async (e) => {
-        const files = Array.from(e.target.files);
-        if (files.length === 0) return;
-
-        document.getElementById('progressArea').style.display = 'block';
+    // 2. Логіка парсингу саме вашого формату
+    async function processFiles(files) {
         const progressBar = document.getElementById('progressBar');
         const statusText = document.getElementById('statusText');
+        document.getElementById('progressArea').style.display = 'block';
 
-        for (let i = 0; i < files.length; i++) {
-            const zipFile = files[i];
-            statusText.innerText = `Обробка архіву ${i+1} з ${files.length}: ${zipFile.name}`;
-            addLog(`Починаю розпакування: ${zipFile.name}`);
+        for (let file of files) {
+            addLog(`Читаю архів: ${file.name}`);
+            const arrayBuffer = await file.arrayBuffer();
+            const zip = fflate.unzipSync(new Uint8Array(arrayBuffer));
 
-            try {
-                const arrayBuffer = await zipFile.arrayBuffer();
-                const zipData = new Uint8Array(arrayBuffer);
-                
-                // Розпаковуємо
-                const unzipped = fflate.unzipSync(zipData); 
-                const filenames = Object.keys(unzipped);
-                
-                let xmlFiles = filenames.filter(name => name.toLowerCase().endsWith('.xml'));
-                addLog(`Знайдено XML файлів: ${xmlFiles.length}`);
-
-                let batch = [];
-                for (let j = 0; j < xmlFiles.length; j++) {
-                    const xmlContent = new TextDecoder().decode(unzipped[xmlFiles[j]]);
+            let batch = [];
+            for (let path in zip) {
+                if (path.toLowerCase().endsWith('.xml')) {
+                    const xmlText = new TextDecoder().decode(zip[path]);
+                    const obj = parser.parse(xmlText);
                     
-                    try {
-                        const jsonObj = parser.parse(xmlContent);
-                        // ТУТ ВАЖЛИВО: Перевірте назви тегів у вашому XML!
-                        // Припустимо, структура: <REPORT><EDRPOU>...</EDRPOU><NAME>...</NAME></REPORT>
-                        // Якщо ваші теги інші - змініть шлях jsonObj.REPORT...
-                        const root = jsonObj.REPORT || jsonObj.document || jsonObj; 
-                        
-                        const edrpou = root.EDRPOU || root.edrpou || "";
-                        const name = root.NAME || root.company_name || "Невідома назва";
+                    // Шлях до даних з вашого скріншоту
+                    const head = obj.DECLAR?.DECLARHEAD;
+                    const body = obj.DECLAR?.DECLARBODY;
 
-                        if (edrpou) {
-                            batch.push({
-                                edrpou: String(edrpou).trim(),
-                                companyName: name,
-                                period: "2023", // Можна витягти з XML
-                                rawXml: xmlContent
-                            });
-                        }
-                    } catch (e) { /* пропускаємо биті файли */ }
+                    if (body) {
+                        const edrpou = body.FIRM_EDRPOU || head?.TIN || "00000000";
+                        const name = body.FIRM_NAME || "Невідома назва";
+                        const year = head?.PERIOD_YEAR || "---";
 
-                    // Записуємо в базу пачками по 100 штук для швидкості
-                    if (batch.length >= 100) {
-                        await db.reports.bulkAdd(batch);
-                        batch = [];
-                        progressBar.value = (j / xmlFiles.length) * 100;
+                        // Витягуємо ключові фінансові показники для "зірочок"
+                        // Наприклад: 1495 (Активи), 2000 (Виручка)
+                        const assets = parseFloat(body.A1495) || 0; 
+                        const revenue = parseFloat(body.A2000) || 0;
+
+                        batch.push({
+                            edrpou: String(edrpou).trim(),
+                            companyName: String(name).trim(),
+                            period: String(year),
+                            assets: assets,
+                            revenue: revenue,
+                            raw: body // зберігаємо весь об'єкт для детального перегляду
+                        });
                     }
                 }
-                if (batch.length > 0) await db.reports.bulkAdd(batch);
-                
-                addLog(`Успішно імпортовано архів: ${zipFile.name}`);
-            } catch (err) {
-                addLog(`Помилка в архіві ${zipFile.name}: ${err.message}`);
+                if (batch.length > 200) {
+                    await db.reports.bulkPut(batch);
+                    batch = [];
+                }
             }
+            if (batch.length > 0) await db.reports.bulkPut(batch);
+            addLog(`Архів ${file.name} оброблено.`);
         }
-        statusText.innerText = "Всі архіви оброблено успішно!";
-        progressBar.value = 100;
-    });
+        statusText.innerText = "Готово! Можна шукати.";
+    }
 
+    // 3. Функція пошуку з вашим дизайном (Картки + Зірочки)
     async function searchCompany() {
-        const val = document.getElementById('searchInput').value.trim();
+        const query = document.getElementById('searchInput').value.trim();
         const resultsArea = document.getElementById('resultsArea');
         resultsArea.innerHTML = "Шукаю...";
 
-        const results = await db.reports.where('edrpou').equals(val).toArray();
+        const results = await db.reports.where('edrpou').equals(query).toArray();
 
         if (results.length === 0) {
-            resultsArea.innerHTML = "<b style='color:red'>Нічого не знайдено. Перевірте ЄДРПОУ або логи завантаження.</b>";
+            resultsArea.innerHTML = "❌ Компанію з таким ЄДРПОУ не знайдено.";
             return;
         }
 
-        resultsArea.innerHTML = results.map(r => `
-            <div class="card" style="border-left: 5px solid #28a745;">
-                <h3>${r.companyName}</h3>
-                <p>ЄДРПОУ: <b>${r.edrpou}</b></p>
-                <button class="btn-main" onclick="alert('Відкриваємо детальний звіт...')">👁 Переглянути звітність</button>
-            </div>
-        `).join('');
+        resultsArea.innerHTML = results.map(r => {
+            // Визначаємо найбільший показник для зірочки
+            const starAssets = r.assets > 1000000 ? "⭐ (Великі активи)" : "";
+            
+            return `
+                <div class="card" style="border-left: 8px solid #007bff;">
+                    <h2 style="margin-top:0">${r.companyName}</h2>
+                    <p>Рік: <b>${r.period}</b> | ЄДРПОУ: <b>${r.edrpou}</b></p>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div style="background: #f8f9fa; padding: 10px; border-radius: 8px;">
+                            <small>Усього активів (ряд. 1495):</small><br>
+                            <strong>${r.assets.toLocaleString()}</strong> ${starAssets}
+                        </div>
+                        <div style="background: #f8f9fa; padding: 10px; border-radius: 8px;">
+                            <small>Дохід (ряд. 2000):</small><br>
+                            <strong>${r.revenue.toLocaleString()}</strong>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <button class="btn-main" style="background:#28a745" onclick="exportExcel('${r.edrpou}')">Excel</button>
+                        <button class="btn-main" style="background:#dc3545" onclick="exportPDF('${r.edrpou}')">PDF</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
-</script>
-
-</body>
-</html>
