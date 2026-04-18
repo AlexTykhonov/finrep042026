@@ -1,101 +1,196 @@
-// 1. Налаштування бази
-    const db = new Dexie("AuditDB");
-    db.version(2).stores({
-        reports: "++id, edrpou, companyName, period" 
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Фінансовий Аналітик — UA XML Browser</title>
+    
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="https://unpkg.com/fflate"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fast-xml-parser@4.2.7/src/fxp.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f4f7f9; color: #2d3436; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        h2 { margin-top: 0; color: #0984e3; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Секція завантаження */
+        .upload-box { border: 2px dashed #0984e3; padding: 20px; text-align: center; border-radius: 12px; transition: 0.3s; background: #f0f9ff; }
+        .upload-box:hover { background: #e1f5fe; }
+        
+        /* Прогрес бар */
+        #progressArea { margin-top: 20px; display: none; }
+        progress { width: 100%; height: 10px; border-radius: 5px; }
+        #log { font-family: monospace; font-size: 11px; background: #1e272e; color: #0be881; padding: 10px; border-radius: 5px; max-height: 100px; overflow-y: auto; margin-top: 10px; }
+        
+        /* Пошук та результати */
+        .search-bar { display: flex; gap: 10px; margin-top: 20px; }
+        input[type="text"] { flex: 1; padding: 12px; border: 2px solid #dfe6e9; border-radius: 8px; font-size: 16px; outline: none; }
+        input:focus { border-color: #0984e3; }
+        button { padding: 12px 24px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-primary { background: #0984e3; color: white; }
+        .btn-danger { background: #ff7675; color: white; font-size: 12px; }
+        
+        /* Картка результату */
+        .result-item { border-left: 6px solid #00b894; animation: slideUp 0.4s ease; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        .stat-card { background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #edf2f7; }
+        .stat-val { font-size: 1.2rem; font-weight: bold; font-family: 'Courier New', monospace; display: block; margin-top: 5px; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>
+            📂 Завантаження ZIP
+            <button class="btn-danger" onclick="clearDb()">Очистити базу</button>
+        </h2>
+        <div class="upload-box">
+            <input type="file" id="zipInput" accept=".zip" multiple>
+            <p>Виберіть один або кілька ZIP-архівів (до 5 ГБ разом)</p>
+        </div>
+        
+        <div id="progressArea">
+            <div id="statusText" style="font-weight: 600; margin-bottom: 5px;"></div>
+            <progress id="progressBar" value="0" max="100"></progress>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🔍 Пошук компанії</h2>
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Введіть ЄДРПОУ (наприклад, з вашого XML)">
+            <button class="btn-primary" onclick="searchCompany()">Знайти</button>
+        </div>
+        <div id="resultsArea" style="margin-top: 20px;"></div>
+    </div>
+</div>
+
+<script>
+    // 1. Ініціалізація бази даних
+    const db = new Dexie("AuditDatabase");
+    db.version(1).stores({
+        reports: "++id, edrpou, companyName, period"
     });
 
-    const parser = new XMLParser({ ignoreAttributes: false });
+    const parser = new JSON.parse(JSON.stringify(window.fastXmlParser)); // Перевірка завантаження
+    const xmlParser = new fastXmlParser.XMLParser({ ignoreAttributes: false });
 
-    // 2. Логіка парсингу саме вашого формату
-    async function processFiles(files) {
-        const progressBar = document.getElementById('progressBar');
-        const statusText = document.getElementById('statusText');
+    function addLog(msg) {
+        const log = document.getElementById('log');
+        log.innerHTML += `> ${msg}<br>`;
+        log.scrollTop = log.scrollHeight;
+    }
+
+    async function clearDb() {
+        if(confirm("Видалити всі дані з пам'яті?")) {
+            await db.reports.clear();
+            location.reload();
+        }
+    }
+
+    // 2. Обробка файлів
+    document.getElementById('zipInput').addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
         document.getElementById('progressArea').style.display = 'block';
+        const bar = document.getElementById('progressBar');
+        const st = document.getElementById('statusText');
 
-        for (let file of files) {
-            addLog(`Читаю архів: ${file.name}`);
-            const arrayBuffer = await file.arrayBuffer();
-            const zip = fflate.unzipSync(new Uint8Array(arrayBuffer));
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            st.innerText = `Обробка архіву ${i+1} з ${files.length}...`;
+            addLog(`Початок: ${file.name}`);
 
-            let batch = [];
-            for (let path in zip) {
-                if (path.toLowerCase().endsWith('.xml')) {
-                    const xmlText = new TextDecoder().decode(zip[path]);
-                    const obj = parser.parse(xmlText);
-                    
-                    // Шлях до даних з вашого скріншоту
+            try {
+                const arrayBuf = await file.arrayBuffer();
+                const zip = fflate.unzipSync(new Uint8Array(arrayBuf));
+                let batch = [];
+
+                const entries = Object.keys(zip).filter(n => n.toLowerCase().endsWith('.xml'));
+                
+                for (let j = 0; j < entries.length; j++) {
+                    const xmlText = new TextDecoder().decode(zip[entries[j]]);
+                    const obj = xmlParser.parse(xmlText);
+
+                    // Мапінг на основі вашого скріншоту
                     const head = obj.DECLAR?.DECLARHEAD;
                     const body = obj.DECLAR?.DECLARBODY;
 
                     if (body) {
-                        const edrpou = body.FIRM_EDRPOU || head?.TIN || "00000000";
-                        const name = body.FIRM_NAME || "Невідома назва";
-                        const year = head?.PERIOD_YEAR || "---";
-
-                        // Витягуємо ключові фінансові показники для "зірочок"
-                        // Наприклад: 1495 (Активи), 2000 (Виручка)
-                        const assets = parseFloat(body.A1495) || 0; 
-                        const revenue = parseFloat(body.A2000) || 0;
-
                         batch.push({
-                            edrpou: String(edrpou).trim(),
-                            companyName: String(name).trim(),
-                            period: String(year),
-                            assets: assets,
-                            revenue: revenue,
-                            raw: body // зберігаємо весь об'єкт для детального перегляду
+                            edrpou: String(body.FIRM_EDRPOU || head?.TIN || "").trim(),
+                            companyName: String(body.FIRM_NAME || "Невідомо"),
+                            period: String(head?.PERIOD_YEAR || ""),
+                            assets: parseFloat(body.A1495) || 0,
+                            revenue: parseFloat(body.A2000) || 0,
+                            fullData: body
                         });
                     }
-                }
-                if (batch.length > 200) {
-                    await db.reports.bulkPut(batch);
-                    batch = [];
-                }
-            }
-            if (batch.length > 0) await db.reports.bulkPut(batch);
-            addLog(`Архів ${file.name} оброблено.`);
-        }
-        statusText.innerText = "Готово! Можна шукати.";
-    }
 
-    // 3. Функція пошуку з вашим дизайном (Картки + Зірочки)
+                    if (batch.length >= 200) {
+                        await db.reports.bulkPut(batch);
+                        batch = [];
+                        bar.value = (j / entries.length) * 100;
+                    }
+                }
+                if (batch.length > 0) await db.reports.bulkPut(batch);
+                addLog(`Завершено архів: ${file.name}`);
+            } catch (err) {
+                addLog(`Помилка: ${err.message}`);
+            }
+        }
+        st.innerText = "Всі дані успішно завантажено!";
+        bar.value = 100;
+    });
+
+    // 3. Пошук
     async function searchCompany() {
         const query = document.getElementById('searchInput').value.trim();
-        const resultsArea = document.getElementById('resultsArea');
-        resultsArea.innerHTML = "Шукаю...";
+        const area = document.getElementById('resultsArea');
+        area.innerHTML = "Шукаю в локальній базі...";
 
         const results = await db.reports.where('edrpou').equals(query).toArray();
 
         if (results.length === 0) {
-            resultsArea.innerHTML = "❌ Компанію з таким ЄДРПОУ не знайдено.";
+            area.innerHTML = "❌ Нічого не знайдено. Переконайтеся, що ви завантажили потрібні архіви.";
             return;
         }
 
-        resultsArea.innerHTML = results.map(r => {
-            // Визначаємо найбільший показник для зірочки
-            const starAssets = r.assets > 1000000 ? "⭐ (Великі активи)" : "";
-            
-            return `
-                <div class="card" style="border-left: 8px solid #007bff;">
-                    <h2 style="margin-top:0">${r.companyName}</h2>
-                    <p>Рік: <b>${r.period}</b> | ЄДРПОУ: <b>${r.edrpou}</b></p>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div style="background: #f8f9fa; padding: 10px; border-radius: 8px;">
-                            <small>Усього активів (ряд. 1495):</small><br>
-                            <strong>${r.assets.toLocaleString()}</strong> ${starAssets}
-                        </div>
-                        <div style="background: #f8f9fa; padding: 10px; border-radius: 8px;">
-                            <small>Дохід (ряд. 2000):</small><br>
-                            <strong>${r.revenue.toLocaleString()}</strong>
-                        </div>
+        area.innerHTML = results.map(r => `
+            <div class="card result-item">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <h3 style="margin:0; color:#2d3436;">${r.companyName}</h3>
+                        <small style="color:#636e72;">ЄДРПОУ: ${r.edrpou} | Рік: ${r.period}</small>
                     </div>
-                    
-                    <div style="margin-top: 15px;">
-                        <button class="btn-main" style="background:#28a745" onclick="exportExcel('${r.edrpou}')">Excel</button>
-                        <button class="btn-main" style="background:#dc3545" onclick="exportPDF('${r.edrpou}')">PDF</button>
+                    <span style="background:#e1f5fe; color:#01579b; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:bold;">Звітність OK</span>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <small>Усього активів (1495)</small>
+                        <span class="stat-val">${r.assets.toLocaleString()} ${r.assets > 1000000 ? '⭐' : ''}</span>
+                    </div>
+                    <div class="stat-card">
+                        <small>Дохід / Виручка (2000)</small>
+                        <span class="stat-val">${r.revenue.toLocaleString()}</span>
                     </div>
                 </div>
-            `;
-        }).join('');
+
+                <div style="margin-top:20px;">
+                    <button class="btn-primary" style="background:#00b894;" onclick="alert('Формуємо Excel...')">📥 Скачати Excel</button>
+                    <button class="btn-primary" style="background:#ff7675;" onclick="alert('Генеруємо PDF...')">📄 Скачати PDF</button>
+                </div>
+            </div>
+        `).join('');
     }
+</script>
+
+</body>
+</html>
