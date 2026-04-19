@@ -2,96 +2,92 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Фінансовий звіт за ДСТУ (НП(С)БОДС 101)</title>
+    <title>Універсальний Фінансовий Аналітик: Всі Форми</title>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="https://unpkg.com/fflate"></script>
     <style>
-        :root { --primary: #2c3e50; --accent: #2980b9; --success: #27ae60; --danger: #c0392b; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1400px; margin: 0 auto; }
-        .card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        
+        :root { --primary: #2c3e50; --blue: #2980b9; --green: #27ae60; --purple: #8e44ad; --bg: #f8f9fa; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 1500px; margin: 0 auto 20px; }
         .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid var(--bg); padding-bottom: 15px; }
         
-        .report-section { margin-bottom: 40px; }
-        .section-title { background: var(--primary); color: white; padding: 10px 20px; border-radius: 5px 5px 0 0; font-size: 16px; font-weight: bold; text-transform: uppercase; }
-        
-        table { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
-        th { background: #f8f9fa; padding: 12px; border: 1px solid #dee2e6; text-align: left; color: #666; }
-        td { padding: 10px; border: 1px solid #dee2e6; }
-        .col-code { width: 60px; text-align: center; color: #999; font-size: 11px; }
+        .report-section { margin-bottom: 35px; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; }
+        .section-title { padding: 12px 20px; font-weight: bold; color: white; text-transform: uppercase; font-size: 14px; }
+        .bg-active { background: var(--blue); }
+        .bg-passive { background: var(--purple); }
+        .bg-result { background: var(--green); }
+        .bg-cash { background: #e67e22; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12px; background: white; }
+        th { background: #f1f3f5; padding: 12px; border: 1px solid #dee2e6; text-align: left; }
+        td { padding: 8px 12px; border: 1px solid #dee2e6; }
+        .col-code { width: 50px; text-align: center; color: #7f8c8d; font-family: monospace; }
         .col-val { width: 140px; text-align: right; font-family: 'Consolas', monospace; font-weight: bold; }
         
-        .row-total { background: #f1f8ff; font-weight: 800; }
-        .row-grand-total { background: #e9ecef; font-weight: 900; text-transform: uppercase; }
-        
-        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .info-box { background: #fcfcfc; border: 1px solid #eee; padding: 15px; border-radius: 8px; }
-        .info-box small { color: #888; display: block; margin-bottom: 5px; text-transform: uppercase; font-size: 10px; }
-        .info-box b { color: var(--primary); font-size: 15px; }
-
-        .btn { padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .btn-upload { background: var(--accent); color: white; }
-        .btn-search { background: var(--success); color: white; width: 100%; height: 45px; }
-        .btn-clear { background: var(--danger); color: white; }
+        .row-total { background: #f8f9fa; font-weight: 800; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; background: #ebf5fb; padding: 15px; border-radius: 8px; border-left: 5px solid var(--blue); }
+        .btn { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; color: white; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="card">
-        <div class="header-flex">
-            <h2 style="margin:0">🏛️ Державний фінансовий моніторинг (НП(С)БОДС)</h2>
-            <div>
-                <button class="btn btn-upload" onclick="document.getElementById('fileIn').click()">📥 ЗАВАНТАЖИТИ XML/ZIP</button>
-                <button class="btn btn-clear" onclick="clearData()">🧹 ОЧИСТИТИ БАЗУ</button>
-            </div>
-        </div>
-        <input type="file" id="fileIn" multiple style="display:none">
-        
-        <div style="display:flex; gap:10px;">
-            <input type="text" id="edrInput" placeholder="Введіть код ЄДРПОУ для генерації звіту..." style="flex:1; padding:12px; border:1px solid #ccc; border-radius:5px; font-size:16px;">
-            <button class="btn btn-search" onclick="displayReport()">🔍 СФОРМУВАТИ ЗВІТНІСТЬ</button>
+<div class="card">
+    <div class="header-flex">
+        <h2 style="margin:0">📊 Універсальний звіт (Комерційний + Бюджетний сектори)</h2>
+        <div>
+            <button class="btn" style="background:var(--blue)" onclick="document.getElementById('fileIn').click()">📥 ЗАВАНТАЖИТИ XML</button>
+            <button class="btn" style="background:#e74c3c; margin-left:10px" onclick="clearDb()">🧹 ОЧИСТИТИ</button>
         </div>
     </div>
-
-    <div id="reportContainer"></div>
+    <input type="file" id="fileIn" multiple style="display:none">
+    <input type="text" id="edrSearch" placeholder="Введіть ЄДРПОУ для аналізу..." style="width:100%; padding:14px; border:1px solid #ced4da; border-radius:6px; font-size:16px; margin-bottom:10px;">
+    <button class="btn" style="background:var(--green); width:100%; font-size:16px;" onclick="runSearch()">🔍 ЗГЕНЕРУВАТИ ПОВНУ ЗВІТНІСТЬ</button>
 </div>
 
-<script>
-    const db = new Dexie("AuditSystemDB");
-    db.version(1).stores({ reports: "++id, edrpou, name, year" });
+<div id="results"></div>
 
-    // ПОВНИЙ СЛОВНИК ЗГІДНО З ПОСТАНОВОЮ (ФОРМИ 1-дс, 2-дс)
-    const officialLabels = {
-        // --- АКТИВ ---
-        "1000": "Основні засоби: первісна вартість", "1001": "Основні засоби: знос", "1002": "Основні засоби: залишкова вартість",
-        "1010": "Інвестиційна нерухомість: первісна вартість", "1011": "Інвестиційна нерухомість: знос", "1012": "Інвестиційна нерухомість: залишкова вартість",
-        "1020": "Нематеріальні активи: первісна вартість", "1021": "Нематеріальні активи: накопичена амортизація", "1022": "Нематеріальні активи: залишкова вартість",
-        "1030": "Незавершені капітальні інвестиції", "1040": "Довгострокові фінансові інвестиції", "1050": "Довгострокова дебіторська заборгованість",
-        "1095": "УСЬОГО ЗА РОЗДІЛОМ I (Необоротні активи)",
-        "1100": "Виробничі запаси", "1110": "МШП", "1120": "Готова продукція", "1130": "Тварини на вирощуванні",
-        "1135": "Дебіторська заборгованість за розрахунками з бюджетом", "1140": "Дебіторська заборгованість за виданими авансами",
-        "1145": "Дебіторська заборгованість за розрахунками з оплати праці", "1150": "Інша поточна дебіторська заборгованість",
-        "1160": "Грошові кошти та їх еквіваленти (у касі, на рахунках)", "1165": "Грошові кошти в дорозі",
-        "1195": "УСЬОГО ЗА РОЗДІЛОМ II (Оборотні активи)", "1200": "Витрати майбутніх періодів",
-        "1300": "БАЛАНС (АКТИВ)",
+<script>
+    const db = new Dexie("UniversalFinanceDB");
+    db.version(1).stores({ reports: "++id, edrpou, name" });
+
+    // ГЛОБАЛЬНИЙ МАПІНГ: ПРИВАТНИЙ СЕКТОР (1000+) + БЮДЖЕТ (2000-3900)
+    const fullMapping = {
+        // --- АКТИВ (ПРИВАТНИЙ + БЮДЖЕТ) ---
+        "1000": "НМА: первісна вартість", "1001": "НМА: накопичена амортизація", "1002": "НМА: залишкова вартість",
+        "1010": "Основні засоби: первісна вартість", "1011": "ОС: знос", "1012": "ОС: залишкова вартість",
+        "1015": "Інвестиційна нерухомість", "1020": "Незавершені капітальні інвестиції",
+        "1030": "Довгострокові фінансові інвестиції", "1095": "УСЬОГО РОЗДІЛ I (Необоротні активи)",
+        "1100": "Запаси", "1125": "Дебіторська заборгованість за товари/послуги", "1135": "Дебіторська заборгованість за авансами виданими",
+        "1155": "Інша поточна дебіторська заборгованість", "1160": "Гроші та еквіваленти", "1195": "УСЬОГО РОЗДІЛ II (Оборотні активи)",
+        "1300": "БАЛАНС АКТИВ (Комерційний)",
+
+        // БЮДЖЕТНІ КОДИ АКТИВУ (з вашого XML)
+        "3010": "Основні засоби: первісна вартість (бюдж)", "3011": "ОС: знос (бюдж)", "3012": "ОС: залишкова вартість (бюдж)",
+        "3015": "Інвестиційна нерухомість: первісна", "3016": "ІН: знос", "3017": "ІН: залишкова",
+        "3020": "Нематеріальні активи: первісна", "3021": "НА: амортизація", "3022": "НА: залишкова",
+        "3025": "Незавершені капітальні інвестиції", "3030": "Довгострокові фін. інвестиції", "3040": "Інші необоротні активи",
+        "3045": "УСЬОГО РОЗДІЛ I", "3050": "Виробничі запаси", "3060": "МШП", "3090": "Готова продукція", "3095": "УСЬОГО ЗАПАСИ",
+        "3100": "Дебіторка з бюджетом", "3110": "Дебіторка за авансами", "3111": "Дебіторка з оплати праці",
+        "3116": "Гроші в банках", "3117": "Гроші в казначействі", "3120": "Інші кошти", "3145": "УСЬОГО РОЗДІЛ III", "3195": "БАЛАНС АКТИВ (Бюджет)",
 
         // --- ПАСИВ ---
-        "1400": "Внесений капітал", "1410": "Капітал у дооцінках", "1420": "Фінансовий результат (дефіцит/профіцит)", "1430": "Резервний капітал", "1440": "Цільове фінансування",
-        "1495": "УСЬОГО ЗА РОЗДІЛОМ I (Власний капітал)",
-        "1500": "Довгострокові зобов'язання", "1530": "Поточна заборгованість за довгостроковими зобов'язаннями",
-        "1540": "Поточна кредиторська заборгованість за товари, роботи, послуги", "1545": "Поточні зобов'язання за розрахунками з бюджетом",
-        "1550": "Поточні зобов'язання за розрахунками з оплати праці", "1555": "Поточні зобов'язання за соціальним страхуванням",
-        "1575": "Інші поточні зобов'язання", "1595": "УСЬОГО ЗА РОЗДІЛОМ II (Зобов'язання)", "1600": "Доходи майбутніх періодів",
-        "1700": "БАЛАНС (ПАСИВ)",
+        "1400": "Статутний капітал", "1410": "Додатковий капітал", "1420": "Резервний капітал", "1421": "Нерозподілений прибуток (збиток)", "1495": "УСЬОГО ВЛАСНИЙ КАПІТАЛ",
+        "1595": "УСЬОГО ДОВГОСТРОКОВІ ЗОБОВ'ЯЗАННЯ", "1615": "Кредиторка за товари/послуги", "1620": "Поточні зобов'язання за авансами",
+        "1625": "Розрахунки з бюджетом", "1630": "Розрахунки зі страхування", "1695": "УСЬОГО ПОТОЧНІ ЗОБОВ'ЯЗАННЯ", "1700": "БАЛАНС ПАСИВ (Комерційний)",
 
-        // --- ФІНРЕЗУЛЬТАТ (Форма 2-дс) ---
-        "2010": "Доходи від обмінних операцій: бюджетні асигнування", "2020": "Доходи від надання послуг (робіт)", "2030": "Доходи від продажу активів", "2100": "Усього доходів від обмінних операцій",
-        "2110": "Податкові надходження", "2120": "Неподаткові надходження", "2130": "Трансферти", "2200": "УСЬОГО ДОХОДІВ",
-        "2210": "Витрати на оплату праці", "2220": "Відрахування на соціальні заходи", "2230": "Матеріальні витрати", "2240": "Амортизація", "2380": "УСЬОГО ВИТРАТ",
-        "2390": "ЧИСТИЙ ФІНАНСОВИЙ РЕЗУЛЬТАТ ЗА ЗВІТНИЙ ПЕРІОД"
+        "3400": "Внесений капітал", "3410": "Капітал у дооцінках", "3420": "Фінансовий результат (бюдж)", "3430": "Резервний капітал", "3440": "Цільове фінансування",
+        "3495": "УСЬОГО РОЗДІЛ I (Власний капітал)", "3510": "Довгострокові кредити", "3595": "УСЬОГО РОЗДІЛ II",
+        "3615": "Кредиторка за товари/послуги", "3620": "Зобов'язання з оплати праці", "3630": "Зобов'язання зі страхування", "3900": "БАЛАНС ПАСИВ (Бюджет)",
+
+        // --- ФІНРЕЗУЛЬТАТ (Форма 2 / 2-дс) ---
+        "2000": "Чистий дохід від реалізації", "2050": "Собівартість реалізації", "2120": "Адміністративні витрати", "2130": "Витрати на збут", "2180": "Інші операційні витрати", "2350": "Чистий прибуток (збиток)",
+        
+        "2010": "Бюджетні асигнування", "2020": "Доходи від послуг", "2030": "Доходи від продажу активів", "2100": "Усього доходів від обмінних операцій",
+        "2110": "Податкові надходження", "2130": "Трансферти (дохід)", "2200": "УСЬОГО ДОХОДІВ",
+        "2210": "Витрати на оплату праці", "2220": "Відрахування на соцзаходи", "2230": "Матеріальні витрати", "2240": "Амортизація", "2380": "УСЬОГО ВИТРАТ", "2390": "ЧИСТИЙ РЕЗУЛЬТАТ ЗА ПЕРІОД"
     };
+
+    const getT = (xml, tag) => (xml.match(new RegExp(`<${tag}[^>]*>(.*?)<\/${tag}>`, 'i'))?.[1] || "").trim();
 
     document.getElementById('fileIn').onchange = async (e) => {
         const files = Array.from(e.target.files);
@@ -101,89 +97,80 @@
                 : [new TextDecoder().decode(await file.arrayBuffer())];
 
             for (let xml of content) {
-                const edr = (xml.match(/<FIRM_EDRPOU>(.*?)<\/FIRM_EDRPOU>/) || xml.match(/<TIN>(.*?)<\/TIN>/))?.[1];
+                const edr = getT(xml, 'FIRM_EDRPOU') || getT(xml, 'TIN');
                 if (!edr) continue;
 
                 const dataMap = {};
-                // Шукаємо теги типу A1010_3 (Актив/Пасив) та B2010_3 (Фінрезультат)
+                // Універсальний збір: шукаємо теги типу <A1010_3>, <B2010_4>, <A3010_3>
                 const regex = /<([AB])(\d+)_([34])>(.*?)<\/\1\2_\3>/g;
-                let match;
-                while ((match = regex.exec(xml)) !== null) {
-                    const code = match[2];
-                    const period = match[3];
-                    const val = parseFloat(match[4]) || 0;
+                let m;
+                while ((m = regex.exec(xml)) !== null) {
+                    const code = m[2];
+                    const val = parseFloat(m[4]) || 0;
                     if (!dataMap[code]) dataMap[code] = { s: 0, e: 0 };
-                    if (period === "3") dataMap[code].s = val; else dataMap[code].e = val;
+                    if (m[3] === "3") dataMap[code].s = val; else dataMap[code].e = val;
                 }
 
                 await db.reports.put({
                     edrpou: edr,
-                    name: (xml.match(/<FIRM_NAME>(.*?)<\/FIRM_NAME>/)?.[1] || "Невідома установа"),
-                    year: (xml.match(/<PERIOD_YEAR>(.*?)<\/PERIOD_YEAR>/)?.[1] || "—"),
-                    ruk: (xml.match(/<FIRM_RUK>(.*?)<\/FIRM_RUK>/)?.[1] || "—"),
-                    buh: (xml.match(/<FIRM_BUH>(.*?)<\/FIRM_BUH>/)?.[1] || "—"),
+                    name: getT(xml, 'FIRM_NAME') || "Установа/Компанія",
+                    year: getT(xml, 'PERIOD_YEAR') || "—",
+                    ruk: getT(xml, 'FIRM_RUK') || "—",
+                    buh: getT(xml, 'FIRM_BUH') || "—",
                     allData: dataMap
                 });
             }
         }
-        alert("Дані успішно завантажено!");
+        alert("Дані завантажено до локальної бази!");
     };
 
-    async function displayReport() {
-        const edr = document.getElementById('edrInput').value.trim();
-        const results = await db.reports.where('edrpou').equals(edr).toArray();
-        const container = document.getElementById('reportContainer');
-        
-        if (!results.length) { container.innerHTML = "❌ Дані для цього ЄДРПОУ не знайдено."; return; }
+    async function runSearch() {
+        const q = document.getElementById('edrSearch').value.trim();
+        const found = await db.reports.where('edrpou').equals(q).toArray();
+        const resDiv = document.getElementById('results');
+        if (!found.length) { resDiv.innerHTML = "❌ Нічого не знайдено."; return; }
 
-        container.innerHTML = results.map(report => {
-            const createTable = (title, start, end, type) => {
-                const rows = Object.keys(report.allData)
-                    .filter(c => {
-                        const ci = parseInt(c);
-                        const d = report.allData[c];
-                        return ci >= start && ci <= end && (d.s !== 0 || d.e !== 0);
-                    })
-                    .sort((a, b) => a - b)
-                    .map(c => {
-                        const d = report.allData[c];
-                        const isTotal = c.endsWith('95') || ["1300", "1700", "2200", "2380", "2390"].includes(c);
-                        return `<tr class="${isTotal ? 'row-total' : ''} ${c === '1300' || c === '1700' ? 'row-grand-total' : ''}">
-                            <td class="col-code">${c}</td>
-                            <td>${officialLabels[c] || "<i>Спеціалізована стаття (" + c + ")</i>"}</td>
-                            <td class="col-val">${d.s.toLocaleString()}</td>
-                            <td class="col-val">${d.e.toLocaleString()}</td>
-                        </tr>`;
-                    }).join('');
+        resDiv.innerHTML = found.map(item => {
+            const table = (title, codesFilter, cls) => {
+                const codes = Object.keys(item.allData)
+                    .filter(codesFilter)
+                    .sort((a, b) => a - b);
+                
+                if (!codes.length) return "";
 
-                if (!rows) return "";
+                const rows = codes.map(c => {
+                    const d = item.allData[c];
+                    const isTotal = c.endsWith('95') || ["1300","1700","3195","3900","2200","2380","2390","2350"].includes(c);
+                    return `<tr class="${isTotal ? 'row-total' : ''}">
+                        <td class="col-code">${c}</td>
+                        <td>${fullMapping[c] || "<i>Спеціалізована стаття (" + c + ")</i>"}</td>
+                        <td class="col-val">${d.s.toLocaleString()}</td>
+                        <td class="col-val">${d.e.toLocaleString()}</td>
+                    </tr>`;
+                }).join('');
 
                 return `<div class="report-section">
-                    <div class="section-title">${title}</div>
-                    <table>
-                        <thead><tr><th>Код</th><th>Стаття звітності</th><th>На початок року</th><th>На кінець року</th></tr></thead>
-                        <tbody>${rows}</tbody>
-                    </table>
-                </div>`;
+                    <div class="section-title ${cls}">${title}</div>
+                    <table><thead><tr><th>Код</th><th>Стаття звітності</th><th>Початок</th><th>Кінець</th></tr></thead>
+                    <tbody>${rows}</tbody></table></div>`;
             };
 
-            return `
-                <div class="card">
-                    <h2 style="color:var(--primary); margin:0 0 20px 0;">${report.name}</h2>
-                    <div class="info-grid">
-                        <div class="info-box"><small>Код ЄДРПОУ</small><b>${report.edrpou}</b></div>
-                        <div class="info-box"><small>Звітний рік</small><b>${report.year}</b></div>
-                        <div class="info-box"><small>Керівник</small><b>${report.ruk}</b></div>
-                        <div class="info-box"><small>Гол. бухгалтер</small><b>${report.buh}</b></div>
-                    </div>
-                    ${createTable("📊 БАЛАНС: АКТИВ (Форма 1-дс)", 1000, 1300)}
-                    ${createTable("📊 БАЛАНС: ПАСИВ (Форма 1-дс)", 1400, 1700)}
-                    ${createTable("📈 ЗВІТ ПРО ФІНАНСОВІ РЕЗУЛЬТАТИ (Форма 2-дс)", 2000, 2400)}
-                </div>`;
+            return `<div class="card">
+                <h3 style="margin-top:0">${item.name}</h3>
+                <div class="info-grid">
+                    <div>ЄДРПОУ: <b>${item.edrpou}</b></div>
+                    <div>Звітний рік: <b>${item.year}</b></div>
+                    <div>Керівник: <b>${item.ruk}</b></div>
+                    <div>Бухгалтер: <b>${item.buh}</b></div>
+                </div>
+                ${table("📊 АКТИВ (Баланс)", c => (parseInt(c) >= 1000 && parseInt(c) <= 1300) || (parseInt(c) >= 3000 && parseInt(c) <= 3195), "bg-active")}
+                ${table("📊 ПАСИВ (Капітал та Зобов'язання)", c => (parseInt(c) >= 1400 && parseInt(c) <= 1700) || (parseInt(c) >= 3400 && parseInt(c) <= 3900), "bg-passive")}
+                ${table("📈 ФІНАНСОВІ РЕЗУЛЬТАТИ (Доходи/Витрати)", c => parseInt(c) >= 2000 && parseInt(c) <= 2999, "bg-result")}
+            </div>`;
         }).join('');
     }
 
-    function clearData() { if(confirm("Видалити всі збережені звіти?")) { db.reports.clear(); location.reload(); } }
+    function clearDb() { if(confirm("Очистити базу?")) { db.reports.clear(); location.reload(); } }
 </script>
 </body>
 </html>
