@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Аналітик Звітності PRO</title>
+    <title>Фінансовий Аналітик PRO (v4.0)</title>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="https://unpkg.com/fflate"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -12,33 +12,34 @@
         .card { background: white; padding: 25px; border-radius: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 1200px; margin: 0 auto 20px; }
         .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-top: 20px; }
         .block { background: #fff; border: 1px solid #e5e5e7; border-radius: 12px; overflow: hidden; }
-        .block-header { padding: 12px 15px; font-weight: bold; font-size: 14px; color: white; display: flex; justify-content: space-between; }
+        .block-header { padding: 12px 15px; font-weight: bold; font-size: 14px; color: white; }
         .bg-active { background: #007aff; }
         .bg-passive { background: #5856d6; }
         .bg-profit { background: #34c759; }
         table { width: 100%; border-collapse: collapse; font-size: 12px; }
         td { padding: 8px 12px; border-bottom: 1px solid #f0f0f2; }
-        .val { text-align: right; font-family: 'Courier New', monospace; font-weight: bold; }
+        .val { text-align: right; font-family: 'Courier New', monospace; font-weight: bold; min-width: 80px; }
         .total-row { background: #f9f9fb; font-weight: 800; border-top: 2px solid #eee; }
-        .star { color: #f1c40f; font-size: 14px; }
-        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; color: white; }
+        .star { color: #f1c40f; font-size: 14px; margin-left: 5px; }
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; color: white; transition: 0.2s; }
+        .btn:active { opacity: 0.7; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2>📊 Професійний Фінансовий Аналіз</h2>
+        <h2>📊 Аналітична панель (Детальна звітність)</h2>
         <div>
             <button class="btn" style="background:var(--blue)" onclick="document.getElementById('fileIn').click()">Завантажити ZIP</button>
             <button class="btn" style="background:var(--red); margin-left:10px" onclick="clearDb()">Очистити базу</button>
         </div>
     </div>
     <input type="file" id="fileIn" multiple accept=".zip" style="display:none">
-    <div id="status" style="margin-top:10px; font-size:14px; color:var(--blue)"></div>
+    <div id="status" style="margin-top:10px; font-size:14px; color:var(--blue); font-weight: bold;"></div>
     
     <div style="margin-top:20px; display:flex; gap:10px;">
-        <input type="text" id="edrSearch" placeholder="Введіть ЄДРПОУ (8 цифр)..." style="flex:1; padding:12px; border-radius:10px; border:1px solid #ccc;">
+        <input type="text" id="edrSearch" placeholder="Введіть ЄДРПОУ компанії..." style="flex:1; padding:12px; border-radius:10px; border:1px solid #ccc; font-size: 16px;">
         <button class="btn" style="background:var(--green)" onclick="runSearch()">Аналізувати</button>
     </div>
 </div>
@@ -46,22 +47,30 @@
 <div id="results"></div>
 
 <script>
-    const db = new Dexie("FinancialAuditDB");
+    const db = new Dexie("FinAuditV4");
     db.version(1).stores({ reports: "++id, edrpou, name" });
 
-    // Повний словник кодів П(С)БО
     const dict = {
-        // АКТИВ
-        "1000": "Нематеріальні активи", "1010": "Основные засоби", "1011": "Знос", "1030": "Інвестиційна нерухомість", "1100": "Запаси", "1125": "Дебіторська заборгованість", "1165": "Гроші та еквіваленти", "1195": "Інші оборотні активи", "1495": "УСЬОГО АКТИВ",
-        // ПАСИВ
-        "1400": "Зареєстрований капітал", "1410": "Додатковий капітал", "1420": "Резервний капітал", "1421": "Нерозподілений прибуток", "1595": "Довгострокові зобов'язання", "1600": "Короткострокові кредити", "1615": "Кредиторська заборгованість", "1900": "УСЬОГО ПАСИВ",
-        // ФІНРЕЗУЛЬТАТ
-        "2000": "Дохід (виручка) від реалізації", "2050": "Собівартість реалізації", "2120": "Інші операційні доходи", "2130": "Адміністративні витрати", "2150": "Витрати на збут", "2280": "Прибуток (збиток) від опер. діяльності", "2290": "Результат до оподаткування", "2350": "ЧИСТИЙ ПРИБУТОК / ЗБИТОК"
+        "1010": "Основні засоби", "1011": "Знос (мінус)", "1100": "Запаси", "1125": "Дебіторська заборгованість", "1165": "Гроші", "1495": "УСЬОГО АКТИВ",
+        "1400": "Капітал", "1421": "Прибуток/Збиток", "1595": "Довгостр. зобов'язання", "1615": "Кредиторська заборг.", "1900": "УСЬОГО ПАСИВ",
+        "2000": "Чистий дохід", "2050": "Собівартість", "2290": "Результат до опод.", "2350": "ЧИСТИЙ ПРИБУТОК"
     };
 
-    const getT = (xml, tag) => {
-        const r = new RegExp(`<${tag}[^>]*>(.*?)<\/${tag}>`, 'i');
-        return xml.match(r)?.[1]?.trim() || "";
+    // НОВИЙ МЕТОД: Пошук значення тегу, навіть якщо у нього є атрибути
+    const parseValue = (xml, code) => {
+        // Шукає <A1495 ...>значення</A1495> або <B2000 ...>значення</B2000>
+        const regex = new RegExp(`<[AB]${code}[^>]*>([\\s\\S]*?)<\/[AB]${code}>`, 'i');
+        const match = xml.match(regex);
+        if (match && match[1]) {
+            const val = match[1].replace(',', '.').replace(/\s/g, ''); // прибираємо пробіли та коми
+            return parseFloat(val) || 0;
+        }
+        return 0;
+    };
+
+    const getGeneralTag = (xml, tag) => {
+        const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\/${tag}>`, 'i');
+        return xml.match(regex)?.[1]?.trim() || "";
     };
 
     document.getElementById('fileIn').onchange = async (e) => {
@@ -75,69 +84,67 @@
             for (let name in zip) {
                 if (name.toLowerCase().endsWith('.xml')) {
                     const xml = new TextDecoder().decode(zip[name]);
-                    const edr = getT(xml, 'FIRM_EDRPOU') || getT(xml, 'TIN') || getT(xml, 'HTIN');
+                    const edr = getGeneralTag(xml, 'FIRM_EDRPOU') || getGeneralTag(xml, 'TIN') || getGeneralTag(xml, 'HTIN');
+                    
                     if (edr) {
                         const allData = {};
-                        // Покращений пошук усіх кодів
-                        const matches = xml.matchAll(/<(A|B)(\d+)[^>]*>(.*?)<\/(A|B)\d+>/gi);
-                        for (const m of matches) { 
-                            const val = m[3].replace(',', '.').trim();
-                            allData[m[2]] = parseFloat(val) || 0; 
+                        // Витягуємо всі можливі коди від 1000 до 2500
+                        for (let c = 1000; c <= 2500; c++) {
+                            const val = parseValue(xml, c);
+                            if (val !== 0) allData[c] = val;
                         }
-                        batch.push({ 
-                            edrpou: edr, 
-                            name: getT(xml, 'FIRM_NAME') || getT(xml, 'HNAME'), 
-                            year: getT(xml, 'PERIOD_YEAR'), 
-                            data: allData 
+
+                        batch.push({
+                            edrpou: edr,
+                            name: getGeneralTag(xml, 'FIRM_NAME') || getGeneralTag(xml, 'HNAME') || "Невідома компанія",
+                            year: getGeneralTag(xml, 'PERIOD_YEAR') || "---",
+                            data: allData
                         });
                     }
                 }
-                if (batch.length > 300) { await db.reports.bulkPut(batch); batch = []; }
+                if (batch.length > 200) { await db.reports.bulkPut(batch); batch = []; }
             }
             if (batch.length > 0) await db.reports.bulkPut(batch);
         }
-        st.innerText = "✅ Дані завантажено. Можна шукати!";
+        st.innerText = "✅ Дані завантажено успішно!";
     };
 
     async function runSearch() {
         const q = document.getElementById('edrSearch').value.trim();
         const found = await db.reports.where('edrpou').equals(q).toArray();
         const resDiv = document.getElementById('results');
-        if (!found.length) { resDiv.innerHTML = "❌ Нічого не знайдено"; return; }
+        if (!found.length) { resDiv.innerHTML = "❌ Компанію не знайдено в базі."; return; }
 
         resDiv.innerHTML = found.map(item => {
             const d = item.data;
-            const getStar = (val, groupKeys) => {
-                const max = Math.max(...groupKeys.map(k => d[k] || 0));
+            const getStar = (val, group) => {
+                const vals = group.map(k => d[k] || 0);
+                const max = Math.max(...vals);
                 return (val === max && max > 0) ? '<span class="star">⭐</span>' : '';
             };
 
-            const renderBlock = (title, keys, colorClass) => {
+            const renderBlock = (title, keys, color) => {
                 let rows = keys.map(k => {
                     const val = d[k] || 0;
-                    const isTotal = k === "1495" || k === "1900" || k === "2350";
-                    return `
-                        <tr class="${isTotal ? 'total-row' : ''}">
-                            <td>${dict[k] || 'Рядок ' + k}</td>
-                            <td class="val">${val.toLocaleString()} ${!isTotal ? getStar(val, keys.filter(x => x!=="1495" && x!=="1900" && x!=="2350")) : ''}</td>
-                        </tr>`;
+                    const isTotal = ["1495", "1900", "2350"].includes(String(k));
+                    return `<tr class="${isTotal ? 'total-row' : ''}">
+                        <td>${dict[k] || 'Рядок ' + k}</td>
+                        <td class="val">${val.toLocaleString(undefined, {minimumFractionDigits: 1})} ${!isTotal ? getStar(val, keys.filter(x => !["1495", "1900", "2350"].includes(String(x)))) : ''}</td>
+                    </tr>`;
                 }).join('');
-                return `<div class="block">
-                    <div class="block-header ${colorClass}"><span>${title}</span></div>
-                    <table>${rows}</table>
-                </div>`;
+                return `<div class="block"><div class="block-header ${color}">${title}</div><table>${rows}</table></div>`;
             };
 
             return `
                 <div class="card">
                     <div style="display:flex; justify-content:space-between">
-                        <div><h2>${item.name}</h2><p>ЄДРПОУ: ${item.edrpou} | Рік: ${item.year}</p></div>
-                        <button class="btn" style="background:var(--green)" onclick="exportExcel('${item.edrpou}')">Excel</button>
+                        <div><h2 style="margin:0">${item.name}</h2><p>ЄДРПОУ: ${item.edrpou} | Рік: ${item.year}</p></div>
+                        <button class="btn" style="background:var(--green)" onclick="exportExcel('${item.edrpou}')">Завантажити Excel</button>
                     </div>
                     <div class="report-grid">
-                        ${renderBlock("🔹 АКТИВ", ["1010", "1011", "1030", "1100", "1125", "1165", "1195", "1495"], "bg-active")}
-                        ${renderBlock("🔸 ПАСИВ", ["1400", "1410", "1420", "1421", "1595", "1600", "1615", "1900"], "bg-passive")}
-                        ${renderBlock("📈 ПРИБУТКИ ТА ЗБИТКИ", ["2000", "2050", "2120", "2130", "2150", "2280", "2290", "2350"], "bg-profit")}
+                        ${renderBlock("🔹 АКТИВ", ["1010", "1011", "1100", "1125", "1165", "1495"], "bg-active")}
+                        ${renderBlock("🔸 ПАСИВ", ["1400", "1421", "1595", "1615", "1900"], "bg-passive")}
+                        ${renderBlock("📈 ПРИБУТКИ", ["2000", "2050", "2290", "2350"], "bg-profit")}
                     </div>
                 </div>`;
         }).join('');
@@ -145,15 +152,15 @@
 
     async function exportExcel(edr) {
         const item = (await db.reports.where('edrpou').equals(edr).toArray())[0];
-        const rows = [["Код", "Стаття", "Значення"]];
-        Object.keys(item.data).forEach(k => rows.push([k, dict[k] || "", item.data[k]]));
+        const rows = [["Код", "Назва статті", "Значення"]];
+        Object.keys(item.data).forEach(k => rows.push([k, dict[k] || "Інша стаття", item.data[k]]));
         const ws = XLSX.utils.aoa_to_sheet(rows);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Звіт");
-        XLSX.writeFile(wb, `Report_${edr}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "Фінансовий Звіт");
+        XLSX.writeFile(wb, `Audit_${edr}.xlsx`);
     }
 
-    function clearDb() { if(confirm("Очистити все?")) { db.reports.clear(); location.reload(); } }
+    function clearDb() { if(confirm("Видалити всі дані з пам'яті?")) { db.reports.clear(); location.reload(); } }
 </script>
 </body>
 </html>
