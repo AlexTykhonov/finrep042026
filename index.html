@@ -2,148 +2,159 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Аналітик Звітності UA</title>
+    <title>Фінансовий Монітор — Експертний Звіт</title>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="https://unpkg.com/fflate"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f5f5f7; padding: 20px; color: #1d1d1f; }
-        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto 20px; }
-        .btn-upload { background: #007aff; color: white; padding: 20px; text-align: center; border-radius: 12px; cursor: pointer; font-weight: bold; border: 2px dashed #0051a8; }
-        #status { margin-top: 15px; font-weight: 600; color: #007aff; text-align: center; }
-        #log { background: #f1f1f1; padding: 10px; border-radius: 8px; font-size: 11px; font-family: monospace; max-height: 100px; overflow: auto; margin-top: 10px; display: none; }
-        input[type="text"] { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #d2d2d7; margin: 10px 0; box-sizing: border-box; font-size: 16px; }
-        .btn-search { background: #34c759; color: white; border: none; width: 100%; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .res-item { border-left: 5px solid #34c759; padding-left: 15px; margin-top: 20px; background: #f9f9f9; padding: 10px; border-radius: 0 8px 8px 0; }
+        :root { --blue: #007aff; --green: #34c759; --dark: #1d1d1f; --gray: #f5f5f7; }
+        body { font-family: -apple-system, sans-serif; background: var(--gray); margin: 0; padding: 20px; color: var(--dark); }
+        .card { background: white; padding: 25px; border-radius: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 1200px; margin: 0 auto 20px; }
+        
+        /* Dashboard Grid */
+        .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-top: 20px; }
+        .block { background: #fff; border: 1px solid #e5e5e7; border-radius: 12px; overflow: hidden; }
+        .block-header { padding: 12px 15px; font-weight: bold; font-size: 14px; color: white; }
+        .bg-active { background: #007aff; }
+        .bg-passive { background: #5856d6; }
+        .bg-profit { background: #34c759; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        td { padding: 8px 12px; border-bottom: 1px solid #f0f0f2; }
+        .val { text-align: right; font-family: 'Courier New', monospace; font-weight: bold; }
+        .star { color: #f1c40f; margin-left: 4px; font-size: 14px; }
+        .total-row { background: #f9f9fb; font-weight: bold; }
+
+        .header-main { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+        .btn-excel { background: var(--green); color: white; }
+        .btn-upload { background: var(--blue); color: white; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2 style="margin-top:0">1. Завантаження ZIP</h2>
-    <div class="btn-upload" onclick="document.getElementById('fileIn').click()">ОБРАТИ ФАЙЛИ</div>
+    <div class="header-main">
+        <h2 style="margin:0">📊 Аналітична панель</h2>
+        <div>
+            <button class="btn btn-upload" onclick="document.getElementById('fileIn').click()">Завантажити архіви</button>
+            <button class="btn" style="background:#ff3b30; color:white; margin-left:10px;" onclick="clearDb()">Очистити</button>
+        </div>
+    </div>
     <input type="file" id="fileIn" multiple accept=".zip" style="display:none">
-    <div id="status">Очікування файлів...</div>
-    <progress id="prog" value="0" max="100" style="width:100%; display:none; margin-top:10px;"></progress>
-    <div id="log"></div>
-    <button onclick="clearAll()" style="color:red; background:none; border:none; margin-top:15px; cursor:pointer; font-size:12px;">Очистити все</button>
+    <div id="status" style="color:var(--blue); font-size:14px; margin-top:10px;"></div>
+    
+    <div style="margin-top:20px; display:flex; gap:10px;">
+        <input type="text" id="edrSearch" placeholder="Введіть ЄДРПОУ компанії..." style="flex:1; padding:12px; border-radius:10px; border:1px solid #d2d2d7;">
+        <button class="btn btn-upload" onclick="runSearch()">Аналізувати</button>
+    </div>
 </div>
 
-<div class="card">
-    <h2>2. Пошук компанії</h2>
-    <input type="text" id="edrSearch" placeholder="Введіть 8 цифр ЄДРПОУ">
-    <button class="btn-search" onclick="runSearch()">ЗНАЙТИ</button>
-    <div id="resultsArea"></div>
-</div>
+<div id="results"></div>
 
 <script>
-    // Ініціалізація бази
-    const db = new Dexie("ReportsData");
-    db.version(1).stores({ reports: "++id, edrpou" });
+    const db = new Dexie("AuditExpertDB");
+    db.version(1).stores({ reports: "++id, edrpou, name" });
 
-    const statusMsg = document.getElementById('status');
-    const logArea = document.getElementById('log');
-    const progressBar = document.getElementById('prog');
-
-    function log(m) {
-        logArea.style.display = 'block';
-        logArea.innerHTML += `> ${m}<br>`;
-        logArea.scrollTop = logArea.scrollHeight;
-    }
-
-    async function clearAll() {
-        if(confirm("Видалити всі дані?")) {
-            await db.reports.clear();
-            location.reload();
-        }
-    }
-
-    // Головна функція обробки
-    document.getElementById('fileIn').onchange = async (e) => {
-        const files = Array.from(e.target.files);
-        if(!files.length) return;
-
-        progressBar.style.display = 'block';
-        
-        for(let file of files) {
-            statusMsg.innerText = `Розпакування: ${file.name}`;
-            log(`Початок обробки ${file.name}`);
-
-            try {
-                const buf = await file.arrayBuffer();
-                const zip = fflate.unzipSync(new Uint8Array(buf));
-                let batch = [];
-                const filenames = Object.keys(zip).filter(n => n.toLowerCase().endsWith('.xml'));
-
-                log(`Знайдено XML: ${filenames.length}`);
-
-                for(let i = 0; i < filenames.length; i++) {
-                    const xmlText = new TextDecoder().decode(zip[filenames[i]]);
-                    
-                    // Найнадійніший метод пошуку даних без зовнішніх бібліотек
-                    const find = (tag) => {
-                        const regex = new RegExp(`<${tag}[^>]*>(.*?)<\/${tag}>`, 'i');
-                        return xmlText.match(regex)?.[1]?.trim() || "";
-                    };
-
-                    const edr = find('FIRM_EDRPOU') || find('TIN') || find('HTIN');
-                    const name = find('FIRM_NAME') || find('HNAME') || "Невідома назва";
-                    const year = find('PERIOD_YEAR') || "---";
-
-                    if(edr) {
-                        batch.push({
-                            edrpou: edr,
-                            name: name,
-                            year: year,
-                            a1495: find('A1495') || "0",
-                            a2000: find('A2000') || "0"
-                        });
-                    }
-
-                    // Зберігаємо пачками по 100 штук, щоб не вішати браузер
-                    if(batch.length >= 100) {
-                        await db.reports.bulkPut(batch);
-                        batch = [];
-                        progressBar.value = (i / filenames.length) * 100;
-                    }
-                }
-                
-                if(batch.length > 0) await db.reports.bulkPut(batch);
-                log(`Завершено: ${file.name}`);
-            } catch(err) {
-                log(`ПОМИЛКА в ${file.name}: ${err.message}`);
-            }
-        }
-        statusMsg.innerText = "✅ Обробка завершена!";
-        progressBar.value = 100;
+    // Словник стандартних назв статей П(С)БО
+    const dictionary = {
+        "1010": "Основні засоби", "1100": "Запаси", "1125": "Дебіторська заборгованість", "1165": "Гроші", "1495": "БАЛАНС (АКТИВ)",
+        "1400": "Власний капітал", "1500": "Довгострокові зобов'язання", "1600": "Поточні зобов'язання", "1900": "БАЛАНС (ПАСИВ)",
+        "2000": "Чистий дохід від реалізації", "2050": "Собівартість реалізації", "2120": "Інші операційні доходи", 
+        "2290": "Фінансовий результат до оподаткування", "2350": "Чистий прибуток / збиток"
     };
 
-    // Функція пошуку
+    const getT = (xml, tag) => {
+        const r = new RegExp(`<${tag}[^>]*>(.*?)<\/${tag}>`, 'i');
+        return xml.match(r)?.[1]?.trim() || "0";
+    };
+
+    document.getElementById('fileIn').onchange = async (e) => {
+        const files = Array.from(e.target.files);
+        const st = document.getElementById('status');
+        for (let file of files) {
+            st.innerText = `⏳ Обробка: ${file.name}...`;
+            const buf = await file.arrayBuffer();
+            const zip = fflate.unzipSync(new Uint8Array(buf));
+            let batch = [];
+            for (let name in zip) {
+                if (name.toLowerCase().endsWith('.xml')) {
+                    const xml = new TextDecoder().decode(zip[name]);
+                    const edr = getT(xml, 'FIRM_EDRPOU') || getT(xml, 'TIN');
+                    if (edr !== "0") {
+                        const allData = {};
+                        const matches = xml.matchAll(/<(A|B)(\d+)[^>]*>(.*?)<\/(A|B)\d+>/gi);
+                        for (const m of matches) { allData[m[2]] = parseFloat(m[3]) || 0; }
+                        batch.push({ edrpou: edr, name: getT(xml, 'FIRM_NAME'), year: getT(xml, 'PERIOD_YEAR'), data: allData });
+                    }
+                }
+                if (batch.length > 200) { await db.reports.bulkPut(batch); batch = []; }
+            }
+            await db.reports.bulkPut(batch);
+        }
+        st.innerText = "✅ Готово до аналізу!";
+    };
+
     async function runSearch() {
         const q = document.getElementById('edrSearch').value.trim();
-        const area = document.getElementById('resultsArea');
-        if(!q) return;
+        const found = await db.reports.where('edrpou').equals(q).toArray();
+        const resDiv = document.getElementById('results');
+        
+        if (!found.length) { resDiv.innerHTML = "❌ Нічого не знайдено"; return; }
 
-        area.innerHTML = "Шукаю...";
-        const res = await db.reports.where('edrpou').equals(q).toArray();
+        resDiv.innerHTML = found.map(item => {
+            const d = item.data;
+            
+            // Функція для пошуку макс. значення в групі для зірочки
+            const getStar = (val, keys) => {
+                const max = Math.max(...keys.map(k => d[k] || 0));
+                return (val === max && max > 0) ? '<span class="star">⭐</span>' : '';
+            };
 
-        if(!res.length) {
-            area.innerHTML = "<p style='color:red'>Нічого не знайдено.</p>";
-            return;
-        }
+            const renderBlock = (title, keys, colorClass) => {
+                let rows = keys.map(k => `
+                    <tr class="${k.endsWith('95') || k==='1900' || k==='2350' ? 'total-row' : ''}">
+                        <td>${dictionary[k] || 'Рядок ' + k}</td>
+                        <td class="val">${(d[k] || 0).toLocaleString()} ${getStar(d[k] || 0, keys.filter(x => !x.endsWith('95') && x!=='1900'))}</td>
+                    </tr>
+                `).join('');
+                return `<div class="block">
+                    <div class="block-header ${colorClass}">${title}</div>
+                    <table>${rows}</table>
+                </div>`;
+            };
 
-        area.innerHTML = res.map(i => `
-            <div class="res-item">
-                <h3 style="margin:0">${i.name}</h3>
-                <small>ЄДРПОУ: ${i.edrpou} | Рік: ${i.year}</small>
-                <div style="margin-top:10px; font-weight:bold; font-size:14px;">
-                    Активи (1495): ${Number(i.a1495).toLocaleString()}<br>
-                    Дохід (2000): ${Number(i.a2000).toLocaleString()}
+            return `
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <h2 style="margin:0">${item.name}</h2>
+                            <p style="color:#666">ЄДРПОУ: ${item.edrpou} | Звіт за ${item.year} рік</p>
+                        </div>
+                        <button class="btn btn-excel" onclick="exportToExcel('${item.edrpou}')">Експорт Excel</button>
+                    </div>
+                    
+                    <div class="report-grid">
+                        ${renderBlock("🔹 АКТИВ (Баланс)", ["1010", "1100", "1125", "1165", "1495"], "bg-active")}
+                        ${renderBlock("🔸 ПАСИВ (Капітал)", ["1400", "1500", "1600", "1900"], "bg-passive")}
+                        ${renderBlock("📈 ФІНАНСОВІ РЕЗУЛЬТАТИ", ["2000", "2050", "2120", "2290", "2350"], "bg-profit")}
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
-</script>
 
+    async function exportToExcel(edrpou) {
+        const item = (await db.reports.where('edrpou').equals(edrpou).toArray())[0];
+        const rows = [["Код", "Стаття", "Значення"]];
+        Object.keys(item.data).forEach(k => rows.push([k, dictionary[k] || "", item.data[k]]));
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Report");
+        XLSX.writeFile(wb, `Report_${edrpou}.xlsx`);
+    }
+
+    function clearDb() { if(confirm("Видалити все?")) { db.reports.clear(); location.reload(); } }
+</script>
 </body>
 </html>
