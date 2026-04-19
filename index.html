@@ -3,128 +3,222 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Аналітик Звітності</title>
+    <title>Фінансовий Аудитор — UA XML</title>
+    
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="https://unpkg.com/fflate"></script>
+
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f4f7f6; padding: 20px; color: #333; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .upload-btn { background: #007aff; color: white; padding: 15px; border-radius: 8px; text-align: center; cursor: pointer; font-weight: bold; }
-        #status { margin-top: 10px; font-size: 14px; color: #666; }
-        input[type="text"] { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        .search-btn { background: #34c759; color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; }
-        .result { border-left: 4px solid #34c759; padding-left: 15px; margin-top: 20px; }
-        #log { font-family: monospace; font-size: 10px; background: #eee; padding: 10px; margin-top: 10px; max-height: 80px; overflow: auto; display: none; }
+        :root { --primary: #007aff; --success: #34c759; --bg: #f5f5f7; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #1d1d1f; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 24px; border-radius: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        
+        .upload-area { 
+            border: 2px dashed var(--primary); 
+            border-radius: 12px; 
+            padding: 40px; 
+            text-align: center; 
+            background: #f0f7ff; 
+            cursor: pointer; 
+            transition: 0.2s;
+        }
+        .upload-area:hover { background: #e3efff; }
+        
+        #progress-box { display: none; margin-top: 20px; }
+        progress { width: 100%; height: 8px; border-radius: 4px; accent-color: var(--primary); }
+        
+        #log { 
+            background: #1c1c1e; 
+            color: #32d74b; 
+            padding: 12px; 
+            border-radius: 8px; 
+            font-family: monospace; 
+            font-size: 11px; 
+            max-height: 120px; 
+            overflow-y: auto; 
+            margin-top: 15px; 
+        }
+
+        .search-group { display: flex; gap: 10px; margin: 20px 0; }
+        input { flex: 1; padding: 14px; border: 1px solid #d2d2d7; border-radius: 10px; font-size: 16px; outline: none; }
+        input:focus { border-color: var(--primary); }
+        
+        button { 
+            padding: 12px 24px; 
+            border-radius: 10px; 
+            border: none; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: 0.2s; 
+        }
+        .btn-search { background: var(--primary); color: white; }
+        .btn-clear { background: #ff3b30; color: white; font-size: 12px; }
+
+        .result-item { 
+            border-left: 5px solid var(--success); 
+            padding-left: 20px; 
+            animation: fadeIn 0.3s ease;
+        }
+        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+        .stat-box { background: #f5f5f7; padding: 12px; border-radius: 10px; }
+        .stat-box b { font-size: 1.1rem; display: block; margin-top: 4px; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>📂 1. Завантаження ZIP</h2>
-    <div class="upload-btn" onclick="document.getElementById('f').click()">ОБРАТИ АРХІВИ</div>
-    <input type="file" id="f" multiple accept=".zip" style="display:none">
-    <div id="status">Очікування файлів...</div>
-    <progress id="p" value="0" max="100" style="width:100%; display:none"></progress>
-    <div id="log"></div>
-    <button onclick="clearDb()" style="margin-top:15px; background:none; border:none; color:red; cursor:pointer; font-size:12px;">✕ Очистити базу даних</button>
-</div>
+<div class="container">
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 style="margin:0">📥 Завантаження</h2>
+            <button class="btn-clear" onclick="clearData()">✕ Видалити все</button>
+        </div>
+        
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <strong>Натисніть, щоб обрати ZIP-архіви</strong>
+            <p style="font-size:13px; color:#86868b">Можна обрати кілька файлів одночасно</p>
+            <input type="file" id="fileInput" multiple accept=".zip" style="display:none">
+        </div>
 
-<div class="card">
-    <h2>🔍 2. Пошук компанії</h2>
-    <input type="text" id="q" placeholder="Введіть ЄДРПОУ...">
-    <button class="search-btn" onclick="srch()">ЗНАЙТИ</button>
-    <div id="res"></div>
+        <div id="progress-box">
+            <div id="status-text" style="font-size:14px; margin-bottom:8px; font-weight:600">Обробка...</div>
+            <progress id="bar" value="0" max="100"></progress>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🔍 Пошук</h2>
+        <div class="search-group">
+            <input type="text" id="searchInput" placeholder="Введіть ЄДРПОУ (8 цифр)...">
+            <button class="btn-search" onclick="doSearch()">Знайти</button>
+        </div>
+        <div id="results"></div>
+    </div>
 </div>
 
 <script>
-    // База даних
-    const db = new Dexie("FinDB");
+    // 1. Ініціалізація бази (IndexedDB)
+    const db = new Dexie("ReportsDatabase");
     db.version(1).stores({ reports: "++id, edrpou" });
 
-    function addLog(m) {
-        const l = document.getElementById('log');
-        l.style.display = 'block';
-        l.innerHTML += `> ${m}<br>`;
+    const logEl = document.getElementById('log');
+    const statusText = document.getElementById('status-text');
+    const progressBar = document.getElementById('bar');
+
+    function addLog(msg) {
+        logEl.innerHTML += `> ${msg}<br>`;
+        logEl.scrollTop = logEl.scrollHeight;
     }
 
-    async function clearDb() {
-        if(confirm("Видалити всі завантажені звіти?")) {
+    async function clearData() {
+        if(confirm("Очистити всю завантажену звітність?")) {
             await db.reports.clear();
-            alert("Базу очищено");
             location.reload();
         }
     }
 
-    // Обробка файлів
-    document.getElementById('f').onchange = async (e) => {
+    // 2. Обробка файлів
+    document.getElementById('fileInput').addEventListener('change', async (e) => {
         const files = Array.from(e.target.files);
         if(!files.length) return;
 
-        const p = document.getElementById('p');
-        const s = document.getElementById('status');
-        p.style.display = 'block';
-
+        document.getElementById('progress-box').style.display = 'block';
+        
         for(let file of files) {
-            s.innerText = `Обробка: ${file.name}`;
+            addLog(`Відкриваю: ${file.name}`);
             try {
-                const buf = await file.arrayBuffer();
-                const zip = fflate.unzipSync(new Uint8Array(buf));
+                const arrayBuffer = await file.arrayBuffer();
+                const zip = fflate.unzipSync(new Uint8Array(arrayBuffer));
                 let batch = [];
+                const entries = Object.keys(zip).filter(n => n.toLowerCase().endsWith('.xml'));
 
-                for(let name in zip) {
-                    if(name.toLowerCase().endsWith('.xml')) {
-                        const str = new TextDecoder().decode(zip[name]);
-                        
-                        // Простий пошук через регулярні вирази (найнадійніший для Safari)
-                        const edrpou = str.match(/<FIRM_EDRPOU>(.*?)<\/FIRM_EDRPOU>/)?.[1] || 
-                                       str.match(/<TIN>(.*?)<\/TIN>/)?.[1];
-                        const cname = str.match(/<FIRM_NAME>(.*?)<\/FIRM_NAME>/)?.[1] || "Компанія без назви";
-                        const year = str.match(/<PERIOD_YEAR>(.*?)<\/PERIOD_YEAR>/)?.[1] || "";
-                        
-                        // Показники
-                        const a1495 = str.match(/<A1495>(.*?)<\/A1495>/)?.[1] || "0";
-                        const a2000 = str.match(/<A2000>(.*?)<\/A2000>/)?.[1] || "0";
+                addLog(`Знайдено XML: ${entries.length}`);
 
-                        if(edrpou) {
-                            batch.push({
-                                edrpou: edrpou.trim(),
-                                name: cname.trim(),
-                                year: year,
-                                a1495: a1495,
-                                a2000: a2000
-                            });
-                        }
+                for(let i = 0; i < entries.length; i++) {
+                    const xmlText = new TextDecoder().decode(zip[entries[i]]);
+                    
+                    // Універсальний пошук тегів через RegEx (найшвидший для браузера)
+                    const getT = (tag) => {
+                        const r = new RegExp(`<${tag}[^>]*>(.*?)<\/${tag}>`, 'i');
+                        return xmlText.match(r)?.[1]?.trim() || "";
+                    };
+
+                    const edrpou = getT('FIRM_EDRPOU') || getT('TIN') || getT('HTIN');
+                    const name = getT('FIRM_NAME') || getT('HNAME') || "Назва не вказана";
+                    const year = getT('PERIOD_YEAR') || "---";
+                    const a1495 = getT('A1495') || "0";
+                    const a2000 = getT('A2000') || "0";
+
+                    if(edrpou) {
+                        batch.push({
+                            edrpou: edrpou,
+                            name: name,
+                            year: year,
+                            assets: a1495,
+                            revenue: a2000
+                        });
                     }
-                    if(batch.length > 100) {
+
+                    // Зберігаємо пачками по 100 штук
+                    if(batch.length >= 100) {
                         await db.reports.bulkPut(batch);
                         batch = [];
+                        progressBar.value = (i / entries.length) * 100;
+                        statusText.innerText = `Завантаження... ${Math.round(progressBar.value)}%`;
                     }
                 }
-                await db.reports.bulkPut(batch);
-                addLog(`Архів ${file.name} додано`);
+                
+                if(batch.length > 0) await db.reports.bulkPut(batch);
+                addLog(`Успішно: ${file.name}`);
             } catch(err) {
                 addLog(`Помилка: ${err.message}`);
+                console.error(err);
             }
         }
-        s.innerText = "Всі файли завантажено!";
-    };
+        statusText.innerText = "✅ Всі дані завантажено успішно!";
+        progressBar.value = 100;
+    });
 
-    // Пошук
-    async function srch() {
-        const q = document.getElementById('q').value.trim();
-        const r = document.getElementById('res');
-        r.innerHTML = "Шукаю...";
+    // 3. Пошук
+    async function doSearch() {
+        const query = document.getElementById('searchInput').value.trim();
+        const resDiv = document.getElementById('results');
+        
+        if(!query) return;
+        resDiv.innerHTML = "Шукаю...";
 
-        const found = await db.reports.where('edrpou').equals(q).toArray();
+        const results = await db.reports.where('edrpou').equals(query).toArray();
 
-        if(!found.length) {
-            r.innerHTML = "❌ Компанію не знайдено";
+        if(!results.length) {
+            resDiv.innerHTML = "<p style='color:#ff3b30'>Нічого не знайдено. Спробуйте інший ЄДРПОУ або перевірте завантаження файлів.</p>";
             return;
         }
 
-        r.innerHTML = found.map(i => `
-            <div class="result">
-                <h3 style="margin:0">${i.name}</h3>
-                <small>ЄДРПОУ: ${i.edrpou} | Рік: ${i.year}</small>
-                <div style="margin-top:10px; display:flex; gap:10px">
-                    <div style="background:#
+        resDiv.innerHTML = results.map(item => `
+            <div class="card result-item">
+                <h3 style="margin:0">${item.name}</h3>
+                <p style="color:#86868b; margin:5px 0">ЄДРПОУ: <b>${item.edrpou}</b> | Рік: <b>${item.year}</b></p>
+                <div class="stats">
+                    <div class="stat-box">
+                        <small>Активи (ряд. 1495)</small>
+                        <b>${Number(item.assets).toLocaleString()}</b>
+                    </div>
+                    <div class="stat-box">
+                        <small>Дохід (ряд. 2000)</small>
+                        <b>${Number(item.revenue).toLocaleString()}</b>
+                    </div>
+                </div>
+                <div style="margin-top:15px; display:flex; gap:10px">
+                    <button onclick="alert('Експорт в Excel скоро буде!')" style="background:#34c759; color:white">Excel</button>
+                    <button onclick="alert('Експорт в PDF скоро буде!')" style="background:#5856d6; color:white">PDF</button>
+                </div>
+            </div>
+        `).join('');
+    }
+</script>
+
+</body>
+</html>
