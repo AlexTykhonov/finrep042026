@@ -2,59 +2,85 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Аналітик Державної Звітності PRO</title>
+    <title>Аналітик Державної Звітності (Full Mapping)</title>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="https://unpkg.com/fflate"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { --blue: #007aff; --green: #34c759; --red: #ff3b30; --gray: #f5f5f7; }
-        body { font-family: -apple-system, sans-serif; background: var(--gray); margin: 0; padding: 20px; color: #1d1d1f; }
-        .card { background: white; padding: 25px; border-radius: 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 1300px; margin: 0 auto 20px; }
-        .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
-        .block { background: #fff; border: 1px solid #e5e5e7; border-radius: 12px; overflow: hidden; }
-        .block-header { padding: 12px 15px; font-weight: bold; color: white; background: var(--blue); }
-        table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        th { text-align: left; padding: 8px; background: #f9f9fb; border-bottom: 2px solid #eee; }
-        td { padding: 6px 8px; border-bottom: 1px solid #f0f0f2; }
-        .val { text-align: right; font-family: monospace; font-weight: bold; }
-        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; color: white; font-weight: 600; }
-        .info-panel { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 15px; padding: 15px; background: #f0f7ff; border-radius: 10px; font-size: 14px; border-left: 5px solid var(--blue); }
-        .info-panel b { color: var(--blue); }
-        .total-row { background: #f9f9fb; font-weight: bold; }
+        :root { --blue: #0056b3; --green: #28a745; --red: #dc3545; --gray: #f8f9fa; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #e9ecef; margin: 0; padding: 20px; }
+        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 1400px; margin: 0 auto 20px; }
+        .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 30px; }
+        .block { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; height: fit-content; }
+        .block-header { padding: 12px 15px; font-weight: bold; color: white; text-transform: uppercase; letter-spacing: 1px; }
+        .bg-active { background: #007bff; }
+        .bg-passive { background: #6f42c1; }
+        .bg-result { background: #20c997; }
+        .bg-cash { background: #fd7e14; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { text-align: left; padding: 10px; background: #f1f3f5; border-bottom: 2px solid #dee2e6; position: sticky; top: 0; }
+        td { padding: 8px 10px; border-bottom: 1px solid #f1f3f5; }
+        .val { text-align: right; font-family: 'Consolas', monospace; font-weight: bold; width: 100px; }
+        .total-row { background: #f8f9fa; font-weight: 800; color: #000; border-top: 2px solid #dee2e6; }
+        
+        .info-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; background: #fff; padding: 20px; border-radius: 10px; border-left: 6px solid var(--blue); margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .info-panel div { font-size: 14px; }
+        .info-panel b { display: block; color: var(--blue); font-size: 16px; margin-top: 4px; }
+        .btn { padding: 12px 24px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; color: white; transition: 0.3s; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2>📊 Повний фінансовий аналіз (Форми 1, 2, 3)</h2>
-        <div>
-            <button class="btn" style="background:var(--blue)" onclick="document.getElementById('fileIn').click()">ОБРАТИ XML/ZIP</button>
-            <button class="btn" style="background:var(--red); margin-left:10px" onclick="clearDb()">Очистити все</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h2 style="margin:0">🏛️ Експерт-аналіз фінансової звітності (НП(С)БОДС)</h2>
+        <div style="display:flex; gap:10px;">
+            <button class="btn" style="background:var(--blue)" onclick="document.getElementById('fileIn').click()">ОБРАТИ ФАЙЛИ</button>
+            <button class="btn" style="background:var(--red)" onclick="clearDb()">ОЧИСТИТИ БАЗУ</button>
         </div>
     </div>
     <input type="file" id="fileIn" multiple style="display:none">
-    <div id="status" style="margin-top:10px; font-size:14px; color:var(--blue); font-weight: bold;"></div>
+    <div id="status" style="font-size:14px; color:var(--blue); font-weight: bold;"></div>
     
     <div style="margin-top:20px; display:flex; gap:10px;">
-        <input type="text" id="edrSearch" placeholder="Введіть 8 цифр ЄДРПОУ..." style="flex:1; padding:12px; border-radius:10px; border:1px solid #ccc; font-size:16px;">
-        <button class="btn" style="background:var(--green)" onclick="runSearch()">ПОКАЗАТИ ЗВІТ</button>
+        <input type="text" id="edrSearch" placeholder="Введіть ЄДРПОУ для аналізу..." style="flex:1; padding:12px; border-radius:8px; border:1px solid #ced4da; font-size:16px;">
+        <button class="btn" style="background:var(--green)" onclick="runSearch()">ВИКОНАТИ ПОШУК</button>
     </div>
 </div>
 
 <div id="results"></div>
 
 <script>
-    const db = new Dexie("GovFinanceDB");
+    const db = new Dexie("ProGovAuditDB");
     db.version(1).stores({ reports: "++id, edrpou, name" });
 
-    // Довідник назв для кодів вашого звіту (серія A3xxx)
-    const dict = {
-        "3010": "Основні засоби (первісна вартість)", "3011": "Знос основних засобів", "3095": "Запаси", 
-        "3100": "Дебіторська заборгованість", "3115": "Грошові кошти (еквіваленти)", "3195": "УСЬОГО АКТИВ",
-        "3400": "Власний капітал", "3615": "Поточна кредиторська заб.", "3900": "УСЬОГО ПАСИВ",
-        "3000": "Чистий дохід від реалізації", "3005": "Собівартість реалізації", "3405": "Чистий прибуток / збиток",
-        "3415": "Залишок коштів на кінець періоду"
+    // ОФІЦІЙНИЙ МАППІНГ РЯДКІВ (НП(С)БОДС)
+    const mapping = {
+        // --- АКТИВ ---
+        "3010": "Основні засоби (первісна вартість)", "3011": "Знос основних засобів (накопичений)", "3012": "Основні засоби (залишкова вартість)",
+        "3020": "Інвестиційна нерухомість (первісна)", "3021": "Знос інвест. нерухомості", "3022": "Інвест. нерухомість (залишкова)",
+        "3030": "Нематеріальні активи (первісна)", "3031": "Накопичена амортизація НМА", "3032": "Нематеріальні активи (залишкова)",
+        "3040": "Незавершені капітальні інвестиції", "3045": "Довгострокові фінансові інвестиції", "3095": "Запаси (матеріали, пальне, товари)",
+        "3100": "Дебіторська заборгованість за розрахунками з бюджетом", "3110": "Дебіторська заборгованість за виданими авансами",
+        "3115": "Грошові кошти та їх еквіваленти", "3195": "УСЬОГО АКТИВ (БАЛАНС)",
+        
+        // --- ПАСИВ ---
+        "3400": "Власний капітал (фонд у необоротних активах)", "3410": "Фінансовий результат (прибуток/збиток)", "3420": "Резервний капітал",
+        "3500": "Довгострокові зобов'язання (позики, цінні папери)", "3600": "Поточна заборгованість за довгостроковими зобов'язаннями",
+        "3615": "Поточна кредиторська заборгованість за товари, роботи, послуги", "3620": "Поточна кредиторська заборгованість за розрахунками з бюджетом",
+        "3630": "Поточна кредиторська заборгованість за розрахунками зі страхування", "3640": "Поточна кредиторська заборгованість за розрахунками з оплати праці",
+        "3900": "УСЬОГО ПАСИВ (БАЛАНС)",
+
+        // --- ФІНРЕЗУЛЬТАТ (Форма 2-дс) ---
+        "2010": "Доходи від обмінних операцій (бюджетні асигнування)", "2020": "Доходи від надання послуг (виконання робіт)",
+        "2030": "Доходи від продажу активів", "2050": "Інші доходи від обмінних операцій", "2130": "Витрати на оплату праці",
+        "2150": "Відрахування на соціальні заходи", "2210": "Матеріальні витрати", "2290": "Результат від операційної діяльності",
+        "2350": "Результат від фінансових операцій", "2390": "Чистий фінансовий результат за звітний період (прибуток/збиток)",
+
+        // --- РУХ КОШТІВ (Форма 3-дс) ---
+        "3405": "Чистий рух коштів за звітний період", "3415": "Залишок коштів на кінець року"
     };
 
     const getT = (xml, tag) => {
@@ -66,7 +92,7 @@
         const files = Array.from(e.target.files);
         const st = document.getElementById('status');
         for (let file of files) {
-            st.innerText = `⏳ Обробка: ${file.name}...`;
+            st.innerText = `⏳ Системний аналіз: ${file.name}...`;
             let xmls = [];
             if (file.name.endsWith('.zip')) {
                 const zip = fflate.unzipSync(new Uint8Array(await file.arrayBuffer()));
@@ -77,7 +103,6 @@
                 const edr = getT(xml, 'FIRM_EDRPOU') || getT(xml, 'TIN');
                 if (edr) {
                     const data = {};
-                    // Шукаємо будь-які теги A..._3 та A..._4
                     const matches = xml.matchAll(/<(A\d+)_([34])[^>]*>(.*?)<\/\1_\2>/gi);
                     for (const m of matches) {
                         const code = m[1].replace('A', '');
@@ -87,57 +112,62 @@
                         if (period === "3") data[code].s = val; else data[code].e = val;
                     }
                     await db.reports.put({ 
-                        edrpou: edr, 
-                        name: getT(xml, 'FIRM_NAME'), 
-                        year: getT(xml, 'PERIOD_YEAR'), 
-                        ruk: getT(xml, 'FIRM_RUK'),
-                        buh: getT(xml, 'FIRM_BUH'),
-                        staff: getT(xml, 'N1'),
+                        edrpou: edr, name: getT(xml, 'FIRM_NAME'), year: getT(xml, 'PERIOD_YEAR'), 
+                        ruk: getT(xml, 'FIRM_RUK'), buh: getT(xml, 'FIRM_BUH'), staff: getT(xml, 'N1'),
                         allData: data 
                     });
                 }
             }
         }
-        st.innerText = "✅ Готово! Можна шукати.";
+        st.innerText = "✅ Аналіз завершено. Введіть ЄДРПОУ для перегляду.";
     };
 
     async function runSearch() {
         const q = document.getElementById('edrSearch').value.trim();
         const found = await db.reports.where('edrpou').equals(q).toArray();
         const resDiv = document.getElementById('results');
-        if (!found.length) { resDiv.innerHTML = "❌ Дані не знайдені."; return; }
+        if (!found.length) { resDiv.innerHTML = "<div class='card'>❌ Об'єкт за ЄДРПОУ " + q + " не знайдено в завантаженій базі.</div>"; return; }
 
         resDiv.innerHTML = found.map(item => {
-            const renderTable = (title, codes, color) => {
+            const renderTable = (title, codes, colorClass) => {
                 let rows = codes.map(c => {
                     const row = item.allData[c] || { s: 0, e: 0 };
-                    return `<tr><td><b>${c}</b> ${dict[c] || 'Рядок звіту'}</td><td class="val">${row.s.toLocaleString()}</td><td class="val">${row.e.toLocaleString()}</td></tr>`;
+                    const isTotal = ["3195", "3900", "2390", "3415"].includes(c);
+                    return `<tr class="${isTotal ? 'total-row' : ''}">
+                        <td><span style="color:#666; font-weight:normal">${c}</span> — ${mapping[c] || 'Спеціалізована стаття'}</td>
+                        <td class="val">${row.s.toLocaleString()}</td>
+                        <td class="val">${row.e.toLocaleString()}</td>
+                    </tr>`;
                 }).join('');
-                return `<div class="block"><div class="block-header" style="background:${color}">${title}</div>
-                        <table><thead><tr><th>Стаття</th><th>На початок</th><th>На кінець</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+                return `<div class="block">
+                    <div class="block-header ${colorClass}">${title}</div>
+                    <table><thead><tr><th>Назва статті звітності</th><th>На початок року</th><th>На кінець року</th></tr></thead><tbody>${rows}</tbody></table>
+                </div>`;
             };
 
-            const allCodes = Object.keys(item.allData).sort();
+            const codes = Object.keys(item.allData).sort();
             
             return `
                 <div class="card">
-                    <h2 style="margin:0 0 10px 0; color:var(--blue)">${item.name}</h2>
+                    <h2 style="color:var(--blue); margin-bottom:10px">${item.name}</h2>
                     <div class="info-panel">
-                        <div>👤 Керівник: <b>${item.ruk || '—'}</b></div>
-                        <div>✍️ Бухгалтер: <b>${item.buh || '—'}</b></div>
-                        <div>👥 Персонал (середня к-сть): <b>${item.staff || '—'} чол.</b></div>
-                        <div>📅 Рік: <b>${item.year}</b></div>
+                        <div>Керівник: <b>${item.ruk || '—'}</b></div>
+                        <div>Головний бухгалтер: <b>${item.buh || '—'}</b></div>
+                        <div>Середня кількість працівників: <b>${item.staff || '—'} чол.</b></div>
+                        <div>Звітний період: <b>${item.year} рік</b></div>
                     </div>
 
                     <div class="report-grid">
-                        ${renderTable("📊 ФОРМА 1-2 (Баланс та Фінрезультат)", allCodes.filter(c => parseInt(c) < 3410), "var(--blue)")}
-                        ${renderTable("💸 ФОРМА 3 (Рух грошових коштів)", allCodes.filter(c => parseInt(c) >= 3410), "var(--purple)")}
+                        ${renderTable("📊 ФОРМА 1-дс: АКТИВИ", codes.filter(c => parseInt(c) >= 3000 && parseInt(c) <= 3195), "bg-active")}
+                        ${renderTable("📊 ФОРМА 1-дс: ПАСИВИ (ЗОБОВ'ЯЗАННЯ ТА КАПІТАЛ)", codes.filter(c => parseInt(c) >= 3400 && parseInt(c) <= 3999), "bg-passive")}
+                        ${renderTable("📈 ФОРМА 2-дс: ФІНАНСОВІ РЕЗУЛЬТАТИ", codes.filter(c => parseInt(c) >= 2000 && parseInt(c) <= 2999), "bg-result")}
+                        ${renderTable("💸 ФОРМА 3-дс: РУХ ГРОШОВИХ КОШТІВ", codes.filter(c => parseInt(c) >= 3405 && parseInt(c) <= 3500), "bg-cash")}
                     </div>
                 </div>`;
         }).join('');
     }
 
-    function clearDb() { if(confirm("Видалити всі дані?")) { db.reports.clear(); location.reload(); } }
+    function clearDb() { if(confirm("Це видалить всю локальну базу. Продовжити?")) { db.reports.clear(); location.reload(); } }
 </script>
 </body>
 </html>
